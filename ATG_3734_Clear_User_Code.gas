@@ -1,0 +1,199 @@
+Program.Sub.ScreenSU.Start
+gui.F_Clear_User_Code..create
+gui.F_Clear_User_Code..caption("Clear User Code Field")
+gui.F_Clear_User_Code..size(4200,1775)
+gui.F_Clear_User_Code..position(0,0)
+gui.F_Clear_User_Code..event(unload,f_clear_user_code_unload)
+gui.F_Clear_User_Code..alwaysontop(False)
+gui.F_Clear_User_Code..fontname("Arial")
+gui.F_Clear_User_Code..fontsize(8)
+gui.F_Clear_User_Code..forecolor(0)
+gui.F_Clear_User_Code..fontstyle(,,,,)
+gui.F_Clear_User_Code..BackColor(-2147483633)
+gui.F_Clear_User_Code..controlbox(True)
+gui.F_Clear_User_Code..maxbutton(False)
+gui.F_Clear_User_Code..minbutton(True)
+gui.F_Clear_User_Code..mousepointer(0)
+gui.F_Clear_User_Code..moveable(True)
+gui.F_Clear_User_Code..sizeable(False)
+gui.F_Clear_User_Code..ShowInTaskBar(True)
+gui.F_Clear_User_Code..titlebar(True)
+gui.F_Clear_User_Code.lbl1.create(label,"Start Date",True,1935,255,1,200,200,True,0,Arial,8,-2147483633,0)
+gui.F_Clear_User_Code.dtpStart.create(datepicker)
+gui.F_Clear_User_Code.dtpStart.visible(True)
+gui.F_Clear_User_Code.dtpStart.size(1800,285)
+gui.F_Clear_User_Code.dtpStart.zorder(0)
+gui.F_Clear_User_Code.dtpStart.position(200,400)
+gui.F_Clear_User_Code.dtpStart.enabled(True)
+gui.F_Clear_User_Code.dtpStart.event(change,dtpstart_lostfocus)
+gui.F_Clear_User_Code.dtpStart.checkbox(False)
+gui.F_Clear_User_Code.dtpStart.event(lostfocus,dtpstart_lostfocus)
+gui.F_Clear_User_Code.lbl2.create(label,"End Date",True,1920,255,1,2100,200,True,0,Arial,8,-2147483633,0)
+gui.F_Clear_User_Code.dtpEnd.create(datepicker)
+gui.F_Clear_User_Code.dtpEnd.visible(True)
+gui.F_Clear_User_Code.dtpEnd.size(1800,285)
+gui.F_Clear_User_Code.dtpEnd.zorder(0)
+gui.F_Clear_User_Code.dtpEnd.position(2100,400)
+gui.F_Clear_User_Code.dtpEnd.enabled(True)
+gui.F_Clear_User_Code.dtpEnd.event(change,dtpend_lostfocus)
+gui.F_Clear_User_Code.dtpEnd.checkbox(False)
+gui.F_Clear_User_Code.dtpEnd.event(lostfocus,dtpend_lostfocus)
+gui.F_Clear_User_Code.cmdOK.create(button)
+gui.F_Clear_User_Code.cmdOK.caption("Clear")
+gui.F_Clear_User_Code.cmdOK.visible(True)
+gui.F_Clear_User_Code.cmdOK.size(855,375)
+gui.F_Clear_User_Code.cmdOK.zorder(0)
+gui.F_Clear_User_Code.cmdOK.position(200,800)
+gui.F_Clear_User_Code.cmdOK.enabled(True)
+gui.F_Clear_User_Code.cmdOK.fontname("Arial")
+gui.F_Clear_User_Code.cmdOK.fontsize(8)
+gui.F_Clear_User_Code.cmdOK.event(click,cmdok_click)
+
+
+Program.Sub.ScreenSU.End
+
+Program.Sub.Preflight.Start
+
+Program.Sub.Preflight.End
+
+Program.Sub.Main.Start
+'Coded by: SMC
+'Project Start Date: 1/5/2011
+'Notes:
+'  Quote 2027 for Customer U.S. Bolt Manufacturing
+'  _______________________________
+'  Clear out User Code Field for WOs w/in Date Range
+'  A GAB program will run off a custom menu item that will allow users to select a date range.  After selecting this date range and clicking OK, all User Code fields for Work Orders generated within this date range (Order Date)  will be cleared.
+'  CODE_SORT will be cleared out in JOB_HEADER where DATE_OPENED is within the selected date range
+
+F.ODBC.Connection!conx.OpenConnection(V.Ambient.PDSN,V.Ambient.PUser,V.Ambient.PPass)
+Gui.F_Clear_User_Code..Show
+
+Program.Sub.Main.End
+
+program.sub.f_clear_user_code_unload.start
+F.ODBC.Connection!conx.Close
+F.Intrinsic.Control.End
+
+program.sub.f_clear_user_code_unload.end
+
+program.sub.cmdok_click.start
+V.Local.sQuery.Declare(String)
+V.Local.sMsg.Declare(String)
+V.Local.sRet.Declare(String)
+V.Local.sStart.Declare(String)
+V.Local.sEnd.Declare(String)
+V.Local.iC.Declare(Long)
+
+F.Intrinsic.Control.CallSub(Check_range)
+F.Intrinsic.Control.If(V.Args.iDiff,<,0)
+	F.Intrinsic.UI.Msgbox("Please verify the selected date range is valid")
+	F.Intrinsic.Control.ExitSub
+F.Intrinsic.Control.EndIf
+
+F.Intrinsic.String.Concat("Continuing will clear the User Code field on all Work Orders that were generated between ",V.Screen.F_Clear_User_Code!dtpStart.Value," and ",V.Screen.F_Clear_User_Code!dtpEnd.Value,".  Would you like to continue?",V.Local.sMsg)
+F.Intrinsic.UI.Msgbox(V.Local.sMsg,"Confirm Dates",4,V.Local.sRet)
+
+F.Intrinsic.Control.If(V.Local.sRet,<>,6)
+	F.Intrinsic.Control.ExitSub
+F.Intrinsic.Control.EndIf
+
+Gui.F_Clear_User_Code..Enabled(False)
+
+F.Intrinsic.Control.CallSub(Reset_user_code)
+
+F.Intrinsic.String.Split(V.Args.sStart,"*!*",V.Local.sStart)
+F.Intrinsic.String.Split(V.Args.sEnd,"*!*",V.Local.sEnd)
+
+F.Intrinsic.Control.If(V.Local.sStart.UBound,<=,V.Local.sEnd.UBound)
+	F.Intrinsic.Control.For(V.Local.iC,0,V.Local.sStart.UBound,1)
+		F.Intrinsic.String.Concat("UPDATE JOB_HEADER SET CODE_SORT='' WHERE DATE_OPENED>='",V.local.sStart(v.Local.iC),"' AND DATE_OPENED<='",V.Local.sEnd(v.Local.iC),"'",V.Local.sQuery)
+		F.ODBC.Connection!conx.Execute(V.Local.sQuery)
+'		F.Intrinsic.UI.Msgbox(V.Local.sQuery)
+	F.Intrinsic.Control.Next(V.Local.iC)
+F.Intrinsic.Control.Else
+	F.Intrinsic.Control.For(V.Local.iC,0,V.Local.sEnd.UBound,1)
+		F.Intrinsic.String.Concat("UPDATE JOB_HEADER SET CODE_SORT='' WHERE DATE_OPENED>='",V.local.sStart(v.Local.iC),"' AND DATE_OPENED<='",V.Local.sEnd(v.Local.iC),"'",V.Local.sQuery)
+		F.ODBC.Connection!conx.Execute(V.Local.sQuery)
+	F.Intrinsic.Control.Next(V.Local.iC)
+F.Intrinsic.Control.EndIf
+
+Gui.F_Clear_User_Code..Enabled(True)
+F.Intrinsic.Control.CallSub(F_clear_user_code_unload)
+
+program.sub.cmdok_click.end
+
+Program.Sub.Check_Range.Start
+'Checks to make sure it is a valid date range.  Returns negative value if End Date is before Start Date.
+V.Local.iStartDate.Declare(Long)
+V.Local.iEndDate.Declare(Long)
+V.Local.sStart.Declare(String)
+V.Local.sEnd.Declare(String)
+V.Local.iDiff.Declare(Long)
+V.Local.iStartY.Declare(Long)
+V.Local.iEndY.Declare(Long)
+V.Local.dTemp.Declare(Date)
+V.Local.sTemp.Declare(String)
+V.Local.sEndY.Declare(String)
+V.Local.sStartY.Declare(String)
+
+'F.Intrinsic.Debug.InvokeDebugger
+F.Intrinsic.Debug.Stop
+F.Intrinsic.String.Format(V.Screen.F_Clear_User_Code!dtpStart.Value,"MMDDYY",V.Local.sStart)
+V.Local.iStartDate.Set(V.Local.sStart)
+
+F.Intrinsic.String.Format(V.Screen.F_Clear_User_Code!dtpEnd.Value,"MMDDYY",V.Local.sEnd)
+V.Local.iEndDate.Set(V.Local.sEnd)
+
+F.Intrinsic.Date.DateDiff("D",V.Screen.F_Clear_User_Code!dtpStart.Value,V.Screen.F_Clear_User_Code!dtpEnd.Value,V.Local.iDiff)
+F.Intrinsic.Control.If(V.Local.iDiff,>,-1)
+	F.Intrinsic.Date.Year(V.Screen.F_Clear_User_Code!dtpStart.Value,V.Local.iStartY)
+	F.Intrinsic.Date.Year(V.Screen.F_Clear_User_Code!dtpEnd.Value,V.Local.iEndY)
+	F.Intrinsic.Control.If(V.Local.iStartY,<,V.Local.iEndY)
+		F.Intrinsic.String.Right(V.Local.iEndY,2,V.Local.sEndY)
+		F.Intrinsic.String.Concat(V.Local.sStart,"*!*","0101",V.Local.sEndY,V.Local.sStart)
+		F.Intrinsic.Date.EndOfMonth(V.Screen.F_Clear_User_Code!dtpStart.Value,V.Local.dTemp)
+		F.Intrinsic.String.Format(V.Local.dTemp,"MMDDYY",V.Local.sTemp)
+		F.Intrinsic.String.Concat(V.Local.sTemp,"*!*",V.Local.sEnd,V.Local.sEnd)
+	F.Intrinsic.Control.EndIf
+F.Intrinsic.Control.EndIf
+
+F.Intrinsic.Variable.AddRV("iDiff",V.Local.iDiff)
+F.Intrinsic.Variable.AddRV("sStart",V.Local.sStart)
+F.Intrinsic.Variable.AddRV("sEnd",V.Local.sEnd)
+
+Program.Sub.Check_Range.End
+
+program.sub.dtpstart_lostfocus.start
+F.Intrinsic.Control.CallSub(Check_range)
+
+F.Intrinsic.Control.If(V.Args.iDiff,<,0)
+	Gui.F_Clear_User_Code.dtpEnd.Value(V.Screen.F_Clear_User_Code!dtpStart.Value)
+F.Intrinsic.Control.EndIf
+
+program.sub.dtpstart_lostfocus.end
+
+program.sub.dtpend_lostfocus.start
+F.Intrinsic.Control.CallSub(Check_range)
+
+F.Intrinsic.Control.If(V.Args.iDiff,<,0)
+	Gui.F_Clear_User_Code.dtpStart.Value(V.Screen.F_Clear_User_Code!dtpEnd.Value)
+F.Intrinsic.Control.EndIf
+
+program.sub.dtpend_lostfocus.end
+
+Program.Sub.Reset_User_Code.Start
+V.Local.bExists.Declare(Boolean)
+V.Local.sRet.Declare(String)
+
+F.ODBC.Connection!conx.TableExists("ATG_3734_Clr_Usr_Cde",V.Local.bExists)
+F.Intrinsic.Control.If(V.Local.bExists,=,True)
+	F.Intrinsic.UI.Msgbox("Would you like to reset the Work Order User Code field to AA01?","Reset Code",4,V.Local.sRet)
+	F.Intrinsic.Control.If(V.Local.sRet,=,6)
+		F.ODBC.Connection!conx.Execute("DELETE FROM ATG_3734_Clr_Usr_Cde")
+	F.Intrinsic.Control.EndIf
+F.Intrinsic.Control.EndIf
+
+Program.Sub.Reset_User_Code.End
+
+
